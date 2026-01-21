@@ -1,0 +1,11 @@
+.git
+.github
+.gitignore
+README.md
+LICENSE
+*.md
+.dockerignore
+docker_*.sh
+venv
+.venv
+*.tar.gz

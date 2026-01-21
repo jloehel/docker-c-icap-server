@@ -1,0 +1,66 @@
+---
+name: Test Build
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+  push:
+    branches:
+      - main
+      - develop
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+
+env:
+  APP_NAME: c-icap-server
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Lint Dockerfile with Hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          ignore: DL3008,DL3018,DL3013,DL3059,DL3041
+
+      - name: Lint shell scripts with ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: './overlay'
+          ignore_paths: 'overlay/build'
+          additional_files: 'docker_*.sh'
+
+  test-build:
+    name: Test Build
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (amd64)
+        run: |
+          export IMAGE_VERSION=test
+          ./docker_build.sh
+
+      - name: Check container starts
+        run: |
+          docker run -d --name test-container ${{ env.APP_NAME }}:test
+          sleep 5
+          docker ps --filter "name=test-container" --filter "status=running" | grep -q test-container
+          docker logs test-container
+          docker rm -f test-container

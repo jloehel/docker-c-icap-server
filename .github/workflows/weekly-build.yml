@@ -1,0 +1,61 @@
+---
+name: Weekly Build
+
+on:
+  schedule:
+    # Run every Sunday at 2:00 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+
+env:
+  APP_NAME: c-icap-server
+
+jobs:
+  weekly-build:
+    name: Weekly Rebuild
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Weekly build and push
+        env:
+          CI_BUILD: "true"
+          REGISTRIES: "ghcr.io/jloehel docker.io/jloehel"
+          PUSH_LATEST: "true"
+        run: ./docker_weekly_build.sh
+
+      - name: Cleanup untagged GHCR images
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: ${{ env.APP_NAME }}
+          package-type: container
+          delete-only-untagged-versions: true
+          min-versions-to-keep: 0
+        continue-on-error: true
